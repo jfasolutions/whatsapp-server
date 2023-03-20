@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import { logger, prisma } from '../shared';
-import { getSession, jidExists } from '../wa';
+import { getSession, jidExists, getJid } from '../wa';
 import { makePhotoURLHandler } from './misc';
 
 export const list: RequestHandler = async (req, res) => {
@@ -63,6 +63,20 @@ export const check: RequestHandler = async (req, res) => {
     const session = getSession(sessionId)!;
 
     const exists = await jidExists(session, jid);
+    res.status(200).json({ exists });
+  } catch (e) {
+    const message = 'An error occured during jid check';
+    logger.error(e, message);
+    res.status(500).json({ error: message });
+  }
+};
+
+export const getId: RequestHandler = async (req, res) => {
+  try {
+    const { sessionId, jid } = req.params;
+    const session = getSession(sessionId)!;
+
+    const exists = await getJid(session, jid);
     res.status(200).json({ exists });
   } catch (e) {
     const message = 'An error occured during jid check';

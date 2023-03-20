@@ -249,6 +249,24 @@ export async function jidExists(
   }
 }
 
+export async function getJid(
+  session: Session,
+  jid: string,
+  type: 'group' | 'number' = 'number'
+) {
+  try {
+    if (type === 'number') {
+      const [result] = await session.onWhatsApp(jid);
+      return result;
+    }
+
+    const groupMeta = await session.groupMetadata(jid);
+    return !!groupMeta.id;
+  } catch (e) {
+    return Promise.reject(e);
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 // export async function dump(fileName: string, data: any) {
 //   const path = join(__dirname, '..', 'debug', `${fileName}.json`);

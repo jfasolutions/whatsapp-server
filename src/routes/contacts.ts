@@ -22,6 +22,7 @@ router.post(
   controller.updateBlock
 );
 router.get('/:jid', sessionValidator, controller.check);
+router.get('/number/:jid', sessionValidator, controller.getId);
 router.get('/:jid/photo', sessionValidator, controller.photo);
 
 export default router;
