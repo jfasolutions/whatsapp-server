@@ -18,10 +18,12 @@
     "format": "prettier . --write"
   },
   "dependencies": {
-   "@whiskeysockets/baileys": "^6.0.0",
-    "@hapi/boom": "^10.0.0",
+    "@adiwajshing/keyed-db": "^0.2.4",
     "@f3lpz/baileys-store": "^1.0.0-beta.2",
+    "@hapi/boom": "^10.0.0",
     "@prisma/client": "^4.7.1",
+    "@whiskeysockets/baileys": "^6.0.0",
+    "axios": "^1.7.7",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
@@ -30,8 +32,7 @@
     "pino": "^8.7.0",
     "qrcode": "^1.5.1",
     "qrcode-terminal": "^0.12.0",
-    "sharp": "^0.30.5",
-    "@adiwajshing/keyed-db": "^0.2.4"
+    "sharp": "^0.30.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.13",

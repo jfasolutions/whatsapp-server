@@ -11,7 +11,7 @@ datasource db {
 }
 
 model Chat {
-  pkId                      Int      @id @default(autoincrement())
+  pkId                      BigInt      @id @default(autoincrement())
   sessionId                 String   @db.VarChar(128)
   archived                  Boolean?
   contactPrimaryIdentityKey Bytes?
@@ -62,7 +62,7 @@ model Chat {
 }
 
 model Contact {
-  pkId         Int     @id @default(autoincrement())
+  pkId         BigInt     @id @default(autoincrement())
   sessionId    String  @db.VarChar(128)
   id           String  @db.VarChar(128)
   name         String? @db.VarChar(128)
@@ -76,7 +76,7 @@ model Contact {
 }
 
 model GroupMetadata {
-  pkId              Int      @id @default(autoincrement())
+  pkId              BigInt      @id @default(autoincrement())
   sessionId         String   @db.VarChar(128)
   id                String   @db.VarChar(128)
   owner             String?  @db.VarChar(128)
@@ -99,7 +99,7 @@ model GroupMetadata {
 }
 
 model Message {
-  pkId                            Int      @id @default(autoincrement())
+  pkId                            BigInt      @id @default(autoincrement())
   sessionId                       String   @db.VarChar(128)
   remoteJid                       String   @db.VarChar(128)
   id                              String   @db.VarChar(128)
@@ -152,7 +152,7 @@ model Message {
 }
 
 model Session {
-  pkId      Int    @id @default(autoincrement())
+  pkId      BigInt    @id @default(autoincrement())
   sessionId String @db.VarChar(128)
   id        String @db.VarChar(255)
   data      String @db.Text

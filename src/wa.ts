@@ -6,10 +6,9 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
 } from '@whiskeysockets/baileys';
 import type { Boom } from '@hapi/boom';
-import { initStore, Store, useSession } from '@f3lpz/baileys-store';
+import { initStore, Store, useSession } from './repository/index';
+//import { useSession } from '@f3lpz/baileys-store';
 import type { Response } from 'express';
-// import { writeFile } from 'fs/promises';
-// import { join } from 'path';
 import { toDataURL } from 'qrcode';
 import type { WebSocket } from 'ws';
 import { logger, prisma } from './shared';
@@ -77,7 +76,7 @@ export async function createSession(options: createSessionOptions) {
         prisma.session.deleteMany({ where: { sessionId } }),
       ]);
     } catch (e) {
-      logger.error(e, 'An error occured during session destroy');
+      logger.error(e, 'An error occurred during session destroy');
     } finally {
       sessions.delete(sessionId);
     }
@@ -111,7 +110,7 @@ export async function createSession(options: createSessionOptions) {
           res.status(200).json({ qr });
           return;
         } catch (e) {
-          logger.error(e, 'An error occured during QR generation');
+          logger.error(e, 'An error occurred during QR generation');
           res.status(500).json({ error: 'Unable to generate QR' });
         }
       }
@@ -125,7 +124,7 @@ export async function createSession(options: createSessionOptions) {
       try {
         qr = await toDataURL(connectionState.qr);
       } catch (e) {
-        logger.error(e, 'An error occured during QR generation');
+        logger.error(e, 'An error occurred during QR generation');
       }
     }
 
@@ -143,6 +142,23 @@ export async function createSession(options: createSessionOptions) {
 
   const handleConnectionUpdate = SSE ? handleSSEConnectionUpdate : handleNormalConnectionUpdate;
   const { state, saveCreds } = await useSession(sessionId);
+
+  // Adapt `state.keys` to implement `SignalKeyStore`
+  const keys = {
+    get: async (type: string, ids: string[]) => {
+      const result: Record<string, any> = {};
+      for (const id of ids) {
+        // Implementar a lógica de busca dos dados necessários
+       // result[id] = /* Obtenha os dados do armazenamento */
+      }
+      return result;
+    },
+    set: async (data: Record<string, any>) => {
+      // Implementar a lógica de armazenamento dos dados
+    },
+    // Outros métodos como 'remove' podem ser implementados aqui se necessário
+  };
+
   const socket = makeWASocket({
     printQRInTerminal: true,
     browser: Browsers.ubuntu('Chrome'),
@@ -150,7 +166,7 @@ export async function createSession(options: createSessionOptions) {
     ...socketConfig,
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
+      keys: makeCacheableSignalKeyStore(keys, logger),
     },
     logger,
     shouldIgnoreJid: (jid) => isJidBroadcast(jid),
@@ -180,19 +196,15 @@ export async function createSession(options: createSessionOptions) {
 
   if (readIncomingMessages) {
     socket.ev.on('messages.upsert', async (m) => {
+      console.log('um aço entao...');
       const message = m.messages[0];
+
       if (message.key.fromMe || m.type !== 'notify') return;
 
       await delay(1000);
       await socket.readMessages([message.key]);
     });
   }
-
-  // Debug events
-  // socket.ev.on('messaging-history.set', (data) => dump('messaging-history.set', data));
-  // socket.ev.on('chats.upsert', (data) => dump('chats.upsert', data));
-  // socket.ev.on('contacts.update', (data) => dump('contacts.update', data));
-  // socket.ev.on('groups.upsert', (data) => dump('groups.upsert', data));
 
   await prisma.session.upsert({
     create: {
@@ -257,18 +269,12 @@ export async function getJid(
   try {
     if (type === 'number') {
       const [result] = await session.onWhatsApp(jid);
-      return result;
+      return result?.jid || null;
     }
 
     const groupMeta = await session.groupMetadata(jid);
-    return !!groupMeta.id;
+    return groupMeta.id;
   } catch (e) {
     return Promise.reject(e);
   }
 }
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-// export async function dump(fileName: string, data: any) {
-//   const path = join(__dirname, '..', 'debug', `${fileName}.json`);
-//   await writeFile(path, JSON.stringify(data, null, 2));
-// }

@@ -1,6 +1,6 @@
 import type { proto, WAGenericMediaMessage, WAMessage } from '@whiskeysockets/baileys';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
-import { serializePrisma } from '@f3lpz/baileys-store';
+import { serializePrisma } from '../repository/index';
 import type { RequestHandler } from 'express';
 import { logger, prisma } from '../shared';
 import { delay as delayMs } from '../utils';
@@ -17,7 +17,7 @@ export const list: RequestHandler = async (req, res) => {
         skip: cursor ? 1 : 0,
         where: { sessionId },
       })
-    ).map((m) => serializePrisma(m));
+    ).map((m: any) => serializePrisma(m));
 
     res.status(200).json({
       data: messages,
