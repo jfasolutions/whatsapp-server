@@ -8,6 +8,8 @@ import {
   sessionExists,
 } from '../wa';
 
+import { useLogger, usePrisma } from '../repository/shared';
+
 export const list: RequestHandler = (req, res) => {
   res.status(200).json(listSessions());
 };
@@ -46,4 +48,31 @@ export const addSSE: RequestHandler = async (req, res) => {
 export const del: RequestHandler = async (req, res) => {
   await deleteSession(req.params.sessionId);
   res.status(200).json({ message: 'Session deleted' });
+};
+
+export const addWebhook: RequestHandler = async (req, res) => {
+  const { sessionId } = req.params;
+  const prisma = usePrisma();
+  const logger = useLogger();
+  logger.info('upserting webhook');
+  await prisma.webhook.upsert({
+    select: { pkId: true },
+    create: { ...req.body, sessionId },
+    update: { ...req.body },
+    where: { sessionId: sessionId!},
+  });
+  res.status(200).json({ status: 'created' });
+};
+
+export const deleteWebhook: RequestHandler = async (req, res) => {
+  const { sessionId } = req.params;
+  const prisma = usePrisma();
+  try {
+    await prisma.webhook.delete({  
+      where: { sessionId: sessionId!},
+    });
+  } catch (e) {
+
+  }
+  res.status(200).json({ status: 'deleted' });
 };

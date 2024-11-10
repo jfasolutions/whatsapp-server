@@ -196,7 +196,6 @@ export async function createSession(options: createSessionOptions) {
 
   if (readIncomingMessages) {
     socket.ev.on('messages.upsert', async (m) => {
-      console.log('um aço entao...');
       const message = m.messages[0];
 
       if (message.key.fromMe || m.type !== 'notify') return;
