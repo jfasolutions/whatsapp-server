@@ -53,13 +53,15 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
           });
 
           if (message.message) {
-            axios.post(`http://api-documentor.test:81/api/whatsapp/${sessionId}/message`, {
+            const webhook = await prisma.webhook.findFirst({ where: { sessionId } });
+            if (webhook) {           
+            axios.post(webhook.url, {
                 message
-              } 
-            ).then(response => {
-              sent.push(message.key.id);
-              console.log(response.data);
-            })
+              }).then(response => {
+                sent.push(message.key.id);
+                console.log(response.data);
+              });
+            }
           }
 
           if (storedMsg) {
