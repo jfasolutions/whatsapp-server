@@ -52,16 +52,20 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
             },
           });
 
-          if (message.message) {
-            const webhook = await prisma.webhook.findFirst({ where: { sessionId } });
-            if (webhook) {           
-            axios.post(webhook.url, {
-                message
-              }).then(response => {
-                sent.push(message.key.id);
-                console.log(response.data);
-              });
+          try {
+            if (message.message) {
+              const webhook = await prisma.webhook.findFirst({ where: { sessionId } });
+              if (webhook) {           
+              axios.post(webhook.url, {
+                  message
+                }).then(response => {
+                  sent.push(message.key.id);
+                  console.log(response.data);
+                });
+              }
             }
+          } catch (e) {
+            console.error('Error sending webhook:', e);
           }
 
           if (storedMsg) {
