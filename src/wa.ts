@@ -67,6 +67,7 @@ export async function createSession(options: createSessionOptions) {
   const { Browsers, DisconnectReason, isJidBroadcast, makeCacheableSignalKeyStore } =
     baileys as any;
   let connectionState: Partial<ConnectionState> = { connection: 'close' };
+  logger.info({ sessionId, SSE, readIncomingMessages }, 'Starting createSession');
 
   const destroy = async (logout = true) => {
     try {
@@ -89,6 +90,7 @@ export async function createSession(options: createSessionOptions) {
     const code = (connectionState.lastDisconnect?.error as Boom)?.output?.statusCode;
     const restartRequired = code === DisconnectReason.restartRequired;
     const doNotReconnect = !shouldReconnect(sessionId);
+    logger.info({ sessionId, code, restartRequired, doNotReconnect }, 'Connection closed');
 
     if (code === DisconnectReason.loggedOut || doNotReconnect) {
       if (res) {
@@ -107,9 +109,11 @@ export async function createSession(options: createSessionOptions) {
 
   const handleNormalConnectionUpdate = async () => {
     if (connectionState.qr?.length) {
+      logger.info({ sessionId, qrLength: connectionState.qr.length }, 'QR received in connection.update');
       if (res && !res.headersSent) {
         try {
           const qr = await toDataURL(connectionState.qr);
+          logger.info({ sessionId, qrDataLength: qr.length }, 'QR converted to data URL; sending in HTTP response');
           res.status(200).json({ qr });
           return;
         } catch (e) {
@@ -124,8 +128,10 @@ export async function createSession(options: createSessionOptions) {
   const handleSSEConnectionUpdate = async () => {
     let qr: string | undefined = undefined;
     if (connectionState.qr?.length) {
+      logger.info({ sessionId, qrLength: connectionState.qr.length }, 'QR received in connection.update (SSE)');
       try {
         qr = await toDataURL(connectionState.qr);
+        logger.info({ sessionId, qrDataLength: qr.length }, 'QR converted to data URL for SSE');
       } catch (e) {
         logger.error(e, 'An error occurred during QR generation');
       }
@@ -140,11 +146,13 @@ export async function createSession(options: createSessionOptions) {
 
     const data = { ...connectionState, qr };
     if (qr) SSEQRGenerations.set(sessionId, currentGenerations + 1);
+    logger.debug({ sessionId, data: { connection: connectionState.connection, hasQr: !!qr } }, 'Writing SSE data');
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
   const handleConnectionUpdate = SSE ? handleSSEConnectionUpdate : handleNormalConnectionUpdate;
   const { state, saveCreds } = await useSession(sessionId);
+  logger.info({ sessionId, hasCreds: !!state?.creds }, 'Loaded session state');
 
   // Adapt `state.keys` to implement `SignalKeyStore`
   const keys = {
@@ -176,7 +184,7 @@ export async function createSession(options: createSessionOptions) {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(keys, logger),
     },
-    logger,
+  logger,
   shouldIgnoreJid: (jid: string) => isJidBroadcast(jid),
   getMessage: async (key: any) => {
       const data = await prisma.message.findFirst({
@@ -185,6 +193,7 @@ export async function createSession(options: createSessionOptions) {
       return (data?.message || undefined) as proto.IMessage | undefined;
     },
   });
+  logger.info({ sessionId }, 'Socket created');
 
   const store = new Store(sessionId, socket.ev);
   sessions.set(sessionId, { ...socket, destroy, store });

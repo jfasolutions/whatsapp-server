@@ -25,16 +25,29 @@ export const status: RequestHandler = (req, res) => {
 export const add: RequestHandler = async (req, res) => {
   const { sessionId, readIncomingMessages, ...socketConfig } = req.body;
 
+  const logger = useLogger();
+  logger.info({ sessionId, socketConfigProvided: !!Object.keys(socketConfig || {}).length }, 'Received request to add session');
+
   if (sessionExists(sessionId)) {
     const existing = getSession(sessionId)!;
     const status = getSessionStatus(existing);
+    logger.info({ sessionId, status }, 'Session exists');
     // If session is authenticated, don't allow creating again
-    if (status === 'AUTHENTICATED') return res.status(400).json({ error: 'Session already exists' });
+    if (status === 'AUTHENTICATED') {
+      logger.warn({ sessionId }, 'Attempt to create already authenticated session');
+      return res.status(400).json({ error: 'Session already exists' });
+    }
     // otherwise try to (re)create to get a fresh QR — do not force destroy to avoid data loss
   }
 
   // createSession will return the QR via the provided `res` when available
-  createSession({ sessionId, res, readIncomingMessages, socketConfig });
+  try {
+    logger.info({ sessionId }, 'Creating session (will respond with QR when available)');
+    createSession({ sessionId, res, readIncomingMessages, socketConfig });
+  } catch (e) {
+    logger.error(e, 'Error while creating session');
+    res.status(500).json({ error: 'Unable to create session' });
+  }
 };
 
 export const addSSE: RequestHandler = async (req, res) => {
@@ -54,7 +67,15 @@ export const addSSE: RequestHandler = async (req, res) => {
       return;
     }
   }
-  createSession({ sessionId, res, SSE: true });
+  const logger = useLogger();
+  logger.info({ sessionId }, 'Creating session via SSE (will stream QR updates)');
+  try {
+    createSession({ sessionId, res, SSE: true });
+  } catch (e) {
+    logger.error(e, 'Error while creating session via SSE');
+    res.write(`data: ${JSON.stringify({ error: 'Unable to create session' })}\n\n`);
+    res.end();
+  }
 };
 
 export const del: RequestHandler = async (req, res) => {
