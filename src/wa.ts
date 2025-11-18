@@ -162,11 +162,16 @@ export async function createSession(options: createSessionOptions) {
     // Outros métodos como 'remove' podem ser implementados aqui se necessário
   };
 
+  // Ensure user-provided socketConfig cannot force QR printing in terminal
+  const finalSocketConfig = { ...(socketConfig || {}) };
+  if ('printQRInTerminal' in finalSocketConfig) delete (finalSocketConfig as any).printQRInTerminal;
+
   const socket = makeWASocket({
-    printQRInTerminal: true,
+    // Do not print QR in terminal; we'll return it via the HTTP response/SSE
+    printQRInTerminal: false,
     browser: Browsers.ubuntu('Chrome'),
     generateHighQualityLinkPreview: true,
-    ...socketConfig,
+    ...finalSocketConfig,
     auth: {
       creds: state.creds,
       keys: makeCacheableSignalKeyStore(keys, logger),
