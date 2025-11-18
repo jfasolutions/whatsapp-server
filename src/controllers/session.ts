@@ -25,7 +25,15 @@ export const status: RequestHandler = (req, res) => {
 export const add: RequestHandler = async (req, res) => {
   const { sessionId, readIncomingMessages, ...socketConfig } = req.body;
 
-  if (sessionExists(sessionId)) return res.status(400).json({ error: 'Session already exists' });
+  if (sessionExists(sessionId)) {
+    const existing = getSession(sessionId)!;
+    const status = getSessionStatus(existing);
+    // If session is authenticated, don't allow creating again
+    if (status === 'AUTHENTICATED') return res.status(400).json({ error: 'Session already exists' });
+    // otherwise try to (re)create to get a fresh QR — do not force destroy to avoid data loss
+  }
+
+  // createSession will return the QR via the provided `res` when available
   createSession({ sessionId, res, readIncomingMessages, socketConfig });
 };
 
@@ -38,9 +46,13 @@ export const addSSE: RequestHandler = async (req, res) => {
   });
 
   if (sessionExists(sessionId)) {
-    res.write(`data: ${JSON.stringify({ error: 'Session already exists' })}\n\n`);
-    res.end();
-    return;
+    const existing = getSession(sessionId)!;
+    const status = getSessionStatus(existing);
+    if (status === 'AUTHENTICATED') {
+      res.write(`data: ${JSON.stringify({ error: 'Session already exists' })}\n\n`);
+      res.end();
+      return;
+    }
   }
   createSession({ sessionId, res, SSE: true });
 };
