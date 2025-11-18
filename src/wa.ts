@@ -1,10 +1,5 @@
 import type { ConnectionState, proto, SocketConfig, WASocket } from '@whiskeysockets/baileys';
-import makeWASocket, {
-  Browsers,
-  DisconnectReason,
-  isJidBroadcast,
-  makeCacheableSignalKeyStore,
-} from '@whiskeysockets/baileys';
+// Use dynamic import for runtime values from baileys (ESM-only) inside createSession
 import type { Boom } from '@hapi/boom';
 import { initStore, Store, useSession } from './repository/index';
 //import { useSession } from '@f3lpz/baileys-store';
@@ -29,7 +24,7 @@ const SSE_MAX_QR_GENERATION = Number(process.env.SSE_MAX_QR_GENERATION || 5);
 const SESSION_CONFIG_ID = 'session-config';
 
 export async function init() {
-  initStore({ prisma, logger });
+  await initStore({ prisma, logger });
   const sessions = await prisma.session.findMany({
     select: { sessionId: true, data: true },
     where: { id: { startsWith: SESSION_CONFIG_ID } },
@@ -63,6 +58,14 @@ type createSessionOptions = {
 export async function createSession(options: createSessionOptions) {
   const { sessionId, res, SSE = false, readIncomingMessages = false, socketConfig } = options;
   const configID = `${SESSION_CONFIG_ID}-${sessionId}`;
+  // Dynamically import baileys runtime helpers to avoid require() of ESM module
+  const baileys = await import('@whiskeysockets/baileys');
+  // makeWASocket may be the default export
+  // cast to any to avoid circular type issues at runtime
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const makeWASocket: any = baileys.default ?? (baileys as any).makeWASocket;
+  const { Browsers, DisconnectReason, isJidBroadcast, makeCacheableSignalKeyStore } =
+    baileys as any;
   let connectionState: Partial<ConnectionState> = { connection: 'close' };
 
   const destroy = async (logout = true) => {
@@ -169,8 +172,8 @@ export async function createSession(options: createSessionOptions) {
       keys: makeCacheableSignalKeyStore(keys, logger),
     },
     logger,
-    shouldIgnoreJid: (jid) => isJidBroadcast(jid),
-    getMessage: async (key) => {
+  shouldIgnoreJid: (jid: string) => isJidBroadcast(jid),
+  getMessage: async (key: any) => {
       const data = await prisma.message.findFirst({
         where: { remoteJid: key.remoteJid!, id: key.id!, sessionId },
       });
@@ -182,7 +185,7 @@ export async function createSession(options: createSessionOptions) {
   sessions.set(sessionId, { ...socket, destroy, store });
 
   socket.ev.on('creds.update', saveCreds);
-  socket.ev.on('connection.update', (update) => {
+  socket.ev.on('connection.update', (update: any) => {
     connectionState = update;
     const { connection } = update;
 
@@ -195,7 +198,7 @@ export async function createSession(options: createSessionOptions) {
   });
 
   if (readIncomingMessages) {
-    socket.ev.on('messages.upsert', async (m) => {
+  socket.ev.on('messages.upsert', async (m: any) => {
       const message = m.messages[0];
 
       if (message.key.fromMe || m.type !== 'notify') return;
@@ -248,9 +251,10 @@ export async function jidExists(
   type: 'group' | 'number' = 'number'
 ) {
   try {
-    if (type === 'number') {
-      const [result] = await session.onWhatsApp(jid);
-      return !!result?.exists;
+      if (type === 'number') {
+      const resultArray = await session.onWhatsApp(jid);
+      const result = resultArray?.[0] ?? null;
+      return result?.jid || null;
     }
 
     const groupMeta = await session.groupMetadata(jid);
@@ -267,7 +271,8 @@ export async function getJid(
 ) {
   try {
     if (type === 'number') {
-      const [result] = await session.onWhatsApp(jid);
+      const resultArray = await session.onWhatsApp(jid);
+      const result = resultArray?.[0] ?? null;
       return result?.jid || null;
     }
 

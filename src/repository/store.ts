@@ -11,9 +11,9 @@ type initStoreOptions = {
 };
 
 /** Initialize shared instances that will be consumed by the Store instance */
-export function initStore({ prisma, logger }: initStoreOptions) {
+export async function initStore({ prisma, logger }: initStoreOptions) {
   setPrisma(prisma);
-  setLogger(logger);
+  await setLogger(logger);
 }
 
 export class Store {

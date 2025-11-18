@@ -1,4 +1,10 @@
-import { toNumber } from '@whiskeysockets/baileys';
+// Avoid importing ESM-only package at top-level. Provide a local safe toNumber
+function toNumberSafe(val: any) {
+  // If it's a Long-like object with toNumber, use it
+  if (val && typeof val.toNumber === 'function') return val.toNumber();
+  if (typeof val === 'bigint') return Number(val);
+  return Number(val || 0);
+}
 import Long from 'long';
 import type { MakeTransformedPrisma, MakeSerializedPrisma } from './types';
 
@@ -13,7 +19,7 @@ export function transformPrisma<T extends Record<string, any>>(
     if (val instanceof Uint8Array) {
       obj[key] = Buffer.from(val);
     } else if (typeof val === 'number' || val instanceof Long) {
-      obj[key] = toNumber(val);
+      obj[key] = toNumberSafe(val);
     } else if (removeNullable && (typeof val === 'undefined' || val === null)) {
       delete obj[key];
     }

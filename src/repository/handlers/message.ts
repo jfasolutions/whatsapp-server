@@ -4,7 +4,7 @@ import type {
   proto,
   WAMessageKey,
 } from '@whiskeysockets/baileys';
-import { jidNormalizedUser, toNumber } from '@whiskeysockets/baileys';
+// Avoid static import of ESM-only package; use dynamic import where runtime helpers are needed
 import { useLogger, usePrisma } from '../shared';
 import type { BaileysEventHandler, MakeTransformedPrisma } from '../types';
 import { transformPrisma } from '../utils';
@@ -73,6 +73,8 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
           }
           
           try {
+            const baileys = await import('@whiskeysockets/baileys');
+            const { jidNormalizedUser, toNumber } = baileys;
             const jid = jidNormalizedUser(message.key.remoteJid!);
             const data = transformPrisma(message);
             await prisma.message.upsert({

@@ -1,12 +1,13 @@
 import type { AuthenticationCreds, SignalDataTypeMap } from '@whiskeysockets/baileys';
-import { proto } from '@whiskeysockets/baileys';
-import { BufferJSON, initAuthCreds } from '@whiskeysockets/baileys';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime';
 import { useLogger, usePrisma } from './shared';
 
 const fixId = (id: string) => id.replace(/\//g, '__').replace(/:/g, '-');
 
 export async function useSession(sessionId: string) {
+  // Dynamically import runtime helpers from baileys (ESM-only)
+  const baileys = await import('@whiskeysockets/baileys');
+  const { proto, BufferJSON, initAuthCreds } = baileys as any;
   const model = usePrisma().session;
   const logger = useLogger();
 

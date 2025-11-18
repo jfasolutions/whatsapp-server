@@ -1,6 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
 import type { SocketConfig } from '@whiskeysockets/baileys';
-import { DEFAULT_CONNECTION_CONFIG } from '@whiskeysockets/baileys';
 import invariant from 'tiny-invariant';
 
 let prisma: PrismaClient | null = null;
@@ -10,8 +9,15 @@ export function setPrisma(prismaClient: PrismaClient) {
   prisma = prismaClient;
 }
 
-export function setLogger(pinoLogger?: SocketConfig['logger']) {
-  logger = pinoLogger || DEFAULT_CONNECTION_CONFIG.logger;
+export async function setLogger(pinoLogger?: SocketConfig['logger']) {
+  if (pinoLogger) {
+    logger = pinoLogger;
+    return;
+  }
+
+  // Dynamic import to avoid require()ing an ESM-only package when compiled to CommonJS
+  const baileys = await import('@whiskeysockets/baileys');
+  logger = baileys.DEFAULT_CONNECTION_CONFIG?.logger ?? null;
 }
 
 export function usePrisma() {

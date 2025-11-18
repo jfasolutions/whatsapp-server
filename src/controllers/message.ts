@@ -1,5 +1,4 @@
 import type { proto, WAGenericMediaMessage, WAMessage } from '@whiskeysockets/baileys';
-import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import { serializePrisma } from '../repository/index';
 import type { RequestHandler } from 'express';
 import { logger, prisma } from '../shared';
@@ -87,6 +86,8 @@ export const download: RequestHandler = async (req, res) => {
     const message = req.body as WAMessage;
     const type = Object.keys(message.message!)[0] as keyof proto.IMessage;
     const content = message.message![type] as WAGenericMediaMessage;
+    const baileys = await import('@whiskeysockets/baileys');
+    const { downloadMediaMessage } = baileys as any;
     const buffer = await downloadMediaMessage(
       message,
       'buffer',
