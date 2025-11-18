@@ -67,6 +67,9 @@ export async function createSession(options: createSessionOptions) {
   const { Browsers, DisconnectReason, isJidBroadcast, makeCacheableSignalKeyStore } =
     baileys as any;
   let connectionState: Partial<ConnectionState> = { connection: 'close' };
+  // immediate console log to ensure we always see when a session creation starts
+  // eslint-disable-next-line no-console
+  console.log(`createSession START sessionId=${sessionId} SSE=${SSE} readIncoming=${readIncomingMessages}`);
   logger.info({ sessionId, SSE, readIncomingMessages }, 'Starting createSession');
 
   const destroy = async (logout = true) => {
@@ -90,6 +93,11 @@ export async function createSession(options: createSessionOptions) {
     const code = (connectionState.lastDisconnect?.error as Boom)?.output?.statusCode;
     const restartRequired = code === DisconnectReason.restartRequired;
     const doNotReconnect = !shouldReconnect(sessionId);
+    // eslint-disable-next-line no-console
+    console.log(`handleConnectionClose sessionId=${sessionId} code=${code} restartRequired=${restartRequired} doNotReconnect=${doNotReconnect}`);
+    // print lastDisconnect for debugging
+    // eslint-disable-next-line no-console
+    console.log('lastDisconnect:', connectionState.lastDisconnect);
     logger.info({ sessionId, code, restartRequired, doNotReconnect }, 'Connection closed');
 
     if (code === DisconnectReason.loggedOut || doNotReconnect) {
@@ -109,6 +117,8 @@ export async function createSession(options: createSessionOptions) {
 
   const handleNormalConnectionUpdate = async () => {
     if (connectionState.qr?.length) {
+      // eslint-disable-next-line no-console
+      console.log(`connection.update QR for sessionId=${sessionId} qrLength=${connectionState.qr.length}`);
       logger.info({ sessionId, qrLength: connectionState.qr.length }, 'QR received in connection.update');
       if (res && !res.headersSent) {
         try {

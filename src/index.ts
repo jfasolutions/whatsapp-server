@@ -7,6 +7,11 @@ import { init } from './wa.js';
 const app = express();
 app.use(cors());
 app.use(express.json());
+// Simple request logger to help debug incoming requests (method + path)
+app.use((req, _res, next) => {
+  console.log(`REQ ${req.method} ${req.path}`);
+  next();
+});
 app.use('/', routes);
 app.all('*', (req, res) => res.status(404).json({ error: 'URL not found' }));
 

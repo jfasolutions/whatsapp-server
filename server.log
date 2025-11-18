@@ -1,0 +1,102 @@
+nohup: ignoring input
+Server is listening on http://172.26.117.5:8092
+REQ GET /sessions/test-sse/add-sse
+HANDLER addSSE invoked for sessionId=test-sse
+(node:73186) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+createSession START sessionId=test-sse SSE=true readIncoming=false
+handleConnectionClose sessionId=test-sse code=405 restartRequired=false doNotReconnect=false
+lastDisconnect: {
+  error: Error: Connection Failure
+      at WebSocketClient.<anonymous> (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:515:13)
+      at WebSocketClient.emit (node:events:518:28)
+      at file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:230:35
+      at Object.decodeFrame (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Utils/noise-handler.js:140:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+    data: { reason: '405', location: 'cco' },
+    isBoom: true,
+    isServer: false,
+    output: { statusCode: 405, payload: [Object], headers: {} }
+  },
+  date: 2025-11-18T01:28:38.746Z
+}
+createSession START sessionId=test-sse SSE=true readIncoming=false
+handleConnectionClose sessionId=test-sse code=405 restartRequired=false doNotReconnect=false
+lastDisconnect: {
+  error: Error: Connection Failure
+      at WebSocketClient.<anonymous> (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:515:13)
+      at WebSocketClient.emit (node:events:518:28)
+      at file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:230:35
+      at Object.decodeFrame (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Utils/noise-handler.js:140:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+    data: { reason: '405', location: 'cco' },
+    isBoom: true,
+    isServer: false,
+    output: { statusCode: 405, payload: [Object], headers: {} }
+  },
+  date: 2025-11-18T01:28:45.092Z
+}
+createSession START sessionId=test-sse SSE=true readIncoming=false
+handleConnectionClose sessionId=test-sse code=405 restartRequired=false doNotReconnect=false
+lastDisconnect: {
+  error: Error: Connection Failure
+      at WebSocketClient.<anonymous> (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:515:13)
+      at WebSocketClient.emit (node:events:518:28)
+      at file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:230:35
+      at Object.decodeFrame (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Utils/noise-handler.js:140:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+    data: { reason: '405', location: 'frc' },
+    isBoom: true,
+    isServer: false,
+    output: { statusCode: 405, payload: [Object], headers: {} }
+  },
+  date: 2025-11-18T01:28:54.480Z
+}
+createSession START sessionId=test-sse SSE=true readIncoming=false
+handleConnectionClose sessionId=test-sse code=405 restartRequired=false doNotReconnect=false
+lastDisconnect: {
+  error: Error: Connection Failure
+      at WebSocketClient.<anonymous> (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:515:13)
+      at WebSocketClient.emit (node:events:518:28)
+      at file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:230:35
+      at Object.decodeFrame (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Utils/noise-handler.js:140:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+    data: { reason: '405', location: 'vll' },
+    isBoom: true,
+    isServer: false,
+    output: { statusCode: 405, payload: [Object], headers: {} }
+  },
+  date: 2025-11-18T01:29:02.474Z
+}
+createSession START sessionId=test-sse SSE=true readIncoming=false
+handleConnectionClose sessionId=test-sse code=405 restartRequired=false doNotReconnect=false
+lastDisconnect: {
+  error: Error: Connection Failure
+      at WebSocketClient.<anonymous> (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:515:13)
+      at WebSocketClient.emit (node:events:518:28)
+      at file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:230:35
+      at Object.decodeFrame (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Utils/noise-handler.js:140:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+    data: { reason: '405', location: 'cco' },
+    isBoom: true,
+    isServer: false,
+    output: { statusCode: 405, payload: [Object], headers: {} }
+  },
+  date: 2025-11-18T01:29:11.226Z
+}
+createSession START sessionId=test-sse SSE=true readIncoming=false
+handleConnectionClose sessionId=test-sse code=405 restartRequired=false doNotReconnect=true
+lastDisconnect: {
+  error: Error: Connection Failure
+      at WebSocketClient.<anonymous> (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:515:13)
+      at WebSocketClient.emit (node:events:518:28)
+      at file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Socket/socket.js:230:35
+      at Object.decodeFrame (file:///home/felpz/whatsapp-server/node_modules/@whiskeysockets/baileys/lib/Utils/noise-handler.js:140:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+    data: { reason: '405', location: 'atn' },
+    isBoom: true,
+    isServer: false,
+    output: { statusCode: 405, payload: [Object], headers: {} }
+  },
+  date: 2025-11-18T01:29:20.790Z
+}
