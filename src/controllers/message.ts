@@ -67,7 +67,7 @@ export const sendBulk: RequestHandler = async (req, res) => {
 
       if (index > 0) await delayMs(delay);
       const result = await session.sendMessage(jid, message, options);
-      results.push({ index, result });
+      results.push({ index, result: result as proto.WebMessageInfo | undefined });
     } catch (e) {
       const message = 'An error occured during message send';
       logger.error(e, message);

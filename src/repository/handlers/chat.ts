@@ -13,19 +13,17 @@ export default function chatHandler(sessionId: string, event: BaileysEventEmitte
       await prisma.$transaction(async (tx) => {
         if (isLatest) await tx.chat.deleteMany({ where: { sessionId } });
 
-        const existingIds = (
-          await tx.chat.findMany({
-            select: { id: true },
-            where: { id: { in: chats.map((c) => c.id) }, sessionId },
-          })
-        ).map((i) => i.id);
-        const chatsAdded = (
-          await tx.chat.createMany({
-            data: chats
-              .filter((c) => !existingIds.includes(c.id))
-              .map((c) => ({ ...transformPrisma(c), sessionId })),
-          })
-        ).count;
+        // Ensure we only work with chats that have a valid id (string)
+        const chatIds = chats.map((c) => c.id).filter((id): id is string => typeof id === 'string' && id !== '');
+        const existingIds = chatIds.length
+          ? (await tx.chat.findMany({ select: { id: true }, where: { id: { in: chatIds }, sessionId } })).map((i) => i.id)
+          : [];
+
+        const toCreate = chats
+          .filter((c) => typeof c.id === 'string' && c.id && !existingIds.includes(c.id))
+          .map((c) => ({ ...transformPrisma(c), id: c.id as string, sessionId }));
+
+        const chatsAdded = toCreate.length ? (await tx.chat.createMany({ data: toCreate })).count : 0;
 
         logger.info({ chatsAdded }, 'Synced chats');
       });
@@ -39,12 +37,13 @@ export default function chatHandler(sessionId: string, event: BaileysEventEmitte
       await Promise.any(
         chats
           .map((c) => transformPrisma(c))
+          .filter((data) => typeof data.id === 'string' && data.id)
           .map((data) =>
             prisma.chat.upsert({
               select: { pkId: true },
-              create: { ...data, sessionId },
-              update: data,
-              where: { sessionId_id: { id: data.id, sessionId } },
+              create: { ...(data as any), id: data.id as string, sessionId },
+              update: data as any,
+              where: { sessionId_id: { id: data.id as string, sessionId } },
             })
           )
       );

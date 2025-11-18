@@ -24,14 +24,23 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
       await prisma.$transaction(async (tx: { message: { deleteMany: (arg0: { where: { sessionId: string; }; }) => any; createMany: (arg0: { data: { remoteJid: string; id: string; sessionId: string; key: object; message?: object | undefined; messageTimestamp?: number | undefined; status?: proto.WebMessageInfo.Status | undefined; participant?: string | undefined; messageC2STimestamp?: number | undefined; ignore?: boolean | undefined; starred?: boolean | undefined; broadcast?: boolean | undefined; pushName?: string | undefined; mediaCiphertextSha256?: Buffer | undefined; multicast?: boolean | undefined; urlText?: boolean | undefined; urlNumber?: boolean | undefined; messageStubType?: proto.WebMessageInfo.StubType | undefined; clearMedia?: boolean | undefined; messageStubParameters?: object | undefined; duration?: number | undefined; labels?: object | undefined; paymentInfo?: object | undefined; finalLiveLocation?: object | undefined; quotedPaymentInfo?: object | undefined; ephemeralStartTimestamp?: number | undefined; ephemeralDuration?: number | undefined; ephemeralOffToOn?: boolean | undefined; ephemeralOutOfSync?: boolean | undefined; bizPrivacyStatus?: proto.WebMessageInfo.BizPrivacyStatus | undefined; verifiedBizName?: string | undefined; mediaData?: object | undefined; photoChange?: object | undefined; userReceipt?: object | undefined; reactions?: object | undefined; quotedStickerData?: object | undefined; futureproofData?: Buffer | undefined; statusPsa?: object | undefined; pollUpdates?: object | undefined; pollAdditionalMetadata?: object | undefined; agentId?: string | undefined; statusAlreadyViewed?: boolean | undefined; messageSecret?: Buffer | undefined; keepInChat?: object | undefined; originalSelfAuthorUserJidString?: string | undefined; revokeMessageTimestamp?: number | undefined; pinInChat?: object | undefined; }[]; }) => any; }; }) => {
         if (isLatest) await tx.message.deleteMany({ where: { sessionId } });
 
-        await tx.message.createMany({
-          data: messages.map((message) => ({
-            ...transformPrisma(message),
-            remoteJid: message.key.remoteJid!,
-            id: message.key.id!,
-            sessionId,
-          })),
-        });
+        // Only create messages that have a valid key with id and remoteJid
+        const validMessages = messages.filter(
+          (m) => m.key && m.key.id && m.key.remoteJid
+        );
+
+        if (validMessages.length) {
+          await tx.message.createMany({
+            data: validMessages.map((message) => ({
+              ...transformPrisma(message),
+              // ensure Prisma sees `key` as an object and id/remoteJid are present
+              key: (message.key as unknown) as object,
+              remoteJid: message.key.remoteJid!,
+              id: message.key.id!,
+              sessionId,
+            })),
+          });
+        }
       });
       logger.info({ messages: messages.length }, 'Synced messages');
     } catch (e) {
@@ -114,6 +123,11 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
           }
 
           const data = { ...prevData, ...update } as proto.IWebMessageInfo;
+          // Ensure the merged data has a key before attempting create
+          if (!data.key || !data.key.id || !data.key.remoteJid) {
+            logger.warn({ update }, 'Skipping message update: missing key information');
+            return;
+          }
           await tx.message.delete({
             select: { pkId: true },
             where: {
@@ -128,6 +142,8 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
             select: { pkId: true },
             data: {
               ...transformPrisma(data),
+              // ensure Prisma non-optional `key` field is present
+              key: (data.key as unknown) as object,
               id: data.key.id!,
               remoteJid: data.key.remoteJid!,
               sessionId,
