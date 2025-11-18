@@ -1,5 +1,5 @@
 import type { RequestHandler } from 'express';
-import { sessionExists } from '../wa';
+import { sessionExists } from '../wa.js';
 
 const validate: RequestHandler = (req, res, next) => {
   if (!sessionExists(req.params.sessionId))

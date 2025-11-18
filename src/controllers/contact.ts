@@ -1,7 +1,7 @@
 import type { RequestHandler } from 'express';
-import { logger, prisma } from '../shared';
-import { getSession, jidExists, getJid } from '../wa';
-import { makePhotoURLHandler } from './misc';
+import { logger, prisma } from '../shared.js';
+import { getSession, jidExists, getJid } from '../wa.js';
+import { makePhotoURLHandler } from './misc.js';
 
 export const list: RequestHandler = async (req, res) => {
   try {

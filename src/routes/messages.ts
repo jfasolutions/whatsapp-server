@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { body, query } from 'express-validator';
-import * as controller from '../controllers/message';
-import requestValidator from '../middlewares/request-validator';
-import sessionValidator from '../middlewares/session-validator';
+import * as controller from '../controllers/message.js';
+import requestValidator from '../middlewares/request-validator.js';
+import sessionValidator from '../middlewares/session-validator.js';
 
 const router = Router({ mergeParams: true });
 router.get(

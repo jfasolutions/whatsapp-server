@@ -6,7 +6,7 @@ function toNumberSafe(val: any) {
   return Number(val || 0);
 }
 import Long from 'long';
-import type { MakeTransformedPrisma, MakeSerializedPrisma } from './types';
+import type { MakeTransformedPrisma, MakeSerializedPrisma } from './types.js';
 
 /** Transform object props value into Prisma-supported types */
 export function transformPrisma<T extends Record<string, any>>(

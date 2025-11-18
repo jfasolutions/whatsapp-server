@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
-import * as controller from '../controllers/session';
-import requestValidator from '../middlewares/request-validator';
-import sessionValidator from '../middlewares/session-validator';
+import * as controller from '../controllers/session.js';
+import requestValidator from '../middlewares/request-validator.js';
+import sessionValidator from '../middlewares/session-validator.js';
 
 const router = Router();
 router.get('/', controller.list);

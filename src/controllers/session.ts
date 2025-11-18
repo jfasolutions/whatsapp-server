@@ -6,9 +6,9 @@ import {
   getSessionStatus,
   listSessions,
   sessionExists,
-} from '../wa';
+} from '../wa.js';
 
-import { useLogger, usePrisma } from '../repository/shared';
+import { useLogger, usePrisma } from '../repository/shared.js';
 
 export const list: RequestHandler = (req, res) => {
   res.status(200).json(listSessions());

@@ -1,6 +1,6 @@
-import { serializePrisma } from '../repository/index';
 import type { RequestHandler } from 'express';
-import { logger, prisma } from '../shared';
+import { logger, prisma } from '../shared.js';
+import { serializePrisma } from '../repository/utils.js';
 
 export const list: RequestHandler = async (req, res) => {
   try {

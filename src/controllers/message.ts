@@ -1,9 +1,9 @@
 import type { proto, WAGenericMediaMessage, WAMessage } from '@whiskeysockets/baileys';
-import { serializePrisma } from '../repository/index';
+import { serializePrisma } from '../repository/utils.js';
 import type { RequestHandler } from 'express';
-import { logger, prisma } from '../shared';
-import { delay as delayMs } from '../utils';
-import { getSession, jidExists } from '../wa';
+import { logger, prisma } from '../shared.js';
+import { delay as delayMs } from '../utils.js';
+import { getSession, jidExists } from '../wa.js';
 
 export const list: RequestHandler = async (req, res) => {
   try {

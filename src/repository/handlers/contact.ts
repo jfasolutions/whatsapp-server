@@ -1,8 +1,7 @@
 import type { BaileysEventEmitter } from '@whiskeysockets/baileys';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime';
-import { useLogger, usePrisma } from '../shared';
-import type { BaileysEventHandler } from '../types';
-import { transformPrisma } from '../utils';
+import { useLogger, usePrisma } from '../shared.js';
+import type { BaileysEventHandler } from '../types.js';
+import { transformPrisma } from '../utils.js';
 
 export default function contactHandler(sessionId: string, event: BaileysEventEmitter) {
   const prisma = usePrisma();
@@ -38,7 +37,7 @@ export default function contactHandler(sessionId: string, event: BaileysEventEmi
         { deletedContacts: deletedOldContactIds.length, newContacts: contacts.length },
         'Synced contacts'
       );
-    } catch (e) {
+      } catch (e) {
       logger.error(e, 'An error occured during contacts set');
     }
   };
@@ -57,9 +56,9 @@ export default function contactHandler(sessionId: string, event: BaileysEventEmi
             })
           )
       );
-    } catch (e) {
-      logger.error(e, 'An error occured during contacts upsert');
-    }
+      } catch (e) {
+        logger.error(e, 'An error occured during contacts upsert');
+      }
   };
 
   const update: BaileysEventHandler<'contacts.update'> = async (updates) => {
@@ -71,7 +70,7 @@ export default function contactHandler(sessionId: string, event: BaileysEventEmi
           where: { sessionId_id: { id: update.id!, sessionId } },
         });
       } catch (e) {
-        if (e instanceof PrismaClientKnownRequestError && e.code === 'P2025') {
+        if ((e as any)?.code === 'P2025') {
           return logger.info({ update }, 'Got update for non existent contact');
         }
         logger.error(e, 'An error occured during contact update');

@@ -5,11 +5,11 @@ import type {
   WAMessageKey,
 } from '@whiskeysockets/baileys';
 // Avoid static import of ESM-only package; use dynamic import where runtime helpers are needed
-import { useLogger, usePrisma } from '../shared';
-import type { BaileysEventHandler, MakeTransformedPrisma } from '../types';
-import { transformPrisma } from '../utils';
+import { useLogger, usePrisma } from '../shared.js';
+import type { BaileysEventHandler, MakeTransformedPrisma } from '../types.js';
+import { transformPrisma } from '../utils.js';
 import axios from 'axios';
-import { send } from '../../controllers/message';
+import { send } from '../../controllers/message.js';
 
 const getKeyAuthor = (key: WAMessageKey | undefined | null) =>
   (key?.fromMe ? 'me' : key?.participant || key?.remoteJid) || '';

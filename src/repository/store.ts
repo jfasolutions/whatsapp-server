@@ -1,7 +1,7 @@
 import type { BaileysEventEmitter, SocketConfig } from '@whiskeysockets/baileys';
 import type { PrismaClient } from '@prisma/client';
-import { setLogger, setPrisma } from './shared';
-import * as handlers from './handlers';
+import { setLogger, setPrisma } from './shared.js';
+import * as handlers from './handlers/index.js';
 
 type initStoreOptions = {
   /** Prisma client instance */

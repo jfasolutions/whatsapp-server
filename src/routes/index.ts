@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import chatRoutes from './chats';
-import contactRoutes from './contacts';
-import groupRoutes from './groups';
-import messageRoutes from './messages';
-import sessionRoutes from './sessions';
+import chatRoutes from './chats.js';
+import contactRoutes from './contacts.js';
+import groupRoutes from './groups.js';
+import messageRoutes from './messages.js';
+import sessionRoutes from './sessions.js';
 
 const router = Router();
 router.use('/sessions', sessionRoutes);

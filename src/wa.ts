@@ -1,13 +1,13 @@
 import type { ConnectionState, proto, SocketConfig, WASocket } from '@whiskeysockets/baileys';
 // Use dynamic import for runtime values from baileys (ESM-only) inside createSession
 import type { Boom } from '@hapi/boom';
-import { initStore, Store, useSession } from './repository/index';
+import { initStore, Store, useSession } from './repository/index.js';
 //import { useSession } from '@f3lpz/baileys-store';
 import type { Response } from 'express';
 import { toDataURL } from 'qrcode';
 import type { WebSocket } from 'ws';
-import { logger, prisma } from './shared';
-import { delay } from './utils';
+import { logger, prisma } from './shared.js';
+import { delay } from './utils.js';
 
 type Session = WASocket & {
   destroy: () => Promise<void>;
