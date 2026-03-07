@@ -187,13 +187,16 @@ export async function createSession(options: createSessionOptions) {
   const socket = makeWASocket({
     // Do not print QR in terminal; we'll return it via the HTTP response/SSE
     printQRInTerminal: false,
-    browser: Browsers.ubuntu('Chrome'),
-    generateHighQualityLinkPreview: true,
-    ...finalSocketConfig,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(keys, logger),
-    },
+    version: [2, 3000, 1033893291],
+    auth: state,
+    browser: ["SendALL", "Chrome", "145.0.0"], 
+   //browser: Browsers.ubuntu('Chrome'),
+   // generateHighQualityLinkPreview: true,
+   // ...finalSocketConfig,
+   // auth: {
+   //   creds: state.creds,
+   //   keys: makeCacheableSignalKeyStore(keys, logger),
+   // },
   logger,
   shouldIgnoreJid: (jid: string) => isJidBroadcast(jid),
   getMessage: async (key: any) => {
