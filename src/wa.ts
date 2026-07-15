@@ -64,8 +64,9 @@ export async function createSession(options: createSessionOptions) {
   // cast to any to avoid circular type issues at runtime
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const makeWASocket: any = baileys.default ?? (baileys as any).makeWASocket;
-  const { Browsers, DisconnectReason, isJidBroadcast, makeCacheableSignalKeyStore } =
+  const { Browsers, DisconnectReason, isJidBroadcast, makeCacheableSignalKeyStore, fetchLatestBaileysVersion } =
     baileys as any;
+  const { version } = await fetchLatestBaileysVersion();
   let connectionState: Partial<ConnectionState> = { connection: 'close' };
   // immediate console log to ensure we always see when a session creation starts
   // eslint-disable-next-line no-console
@@ -187,7 +188,7 @@ export async function createSession(options: createSessionOptions) {
   const socket = makeWASocket({
     // Do not print QR in terminal; we'll return it via the HTTP response/SSE
     printQRInTerminal: false,
-    version: [2, 3000, 1033893291],
+    version,
     auth: state,
     browser: ["SendALL", "Chrome", "145.0.0"], 
    //browser: Browsers.ubuntu('Chrome'),
