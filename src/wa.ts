@@ -126,13 +126,19 @@ export async function createSession(options: createSessionOptions) {
           const qr = await toDataURL(connectionState.qr);
           logger.info({ sessionId, qrDataLength: qr.length }, 'QR converted to data URL; sending in HTTP response');
           res.status(200).json({ qr });
-          return;
         } catch (e) {
           logger.error(e, 'An error occurred during QR generation');
           res.status(500).json({ error: 'Unable to generate QR' });
         }
+        return;
       }
-      destroy();
+      // O QR já foi entregue na resposta HTTP. O WhatsApp gera um novo QR
+      // a cada ~20s enquanto o usuário não escaneia (até uns 3 ciclos,
+      // ~60s no total) — isso também dispara connection.update aqui. Antes
+      // a sessão era destruída nesse ponto (por já não ter res disponível
+      // pra responder de novo), matando o QR bem antes do cliente conseguir
+      // ler/escanear. Só quem deve encerrar a sessão é o fechamento real da
+      // conexão, tratado em handleConnectionClose.
     }
   };
 
