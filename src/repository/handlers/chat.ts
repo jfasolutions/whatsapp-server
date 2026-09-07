@@ -34,7 +34,10 @@ export default function chatHandler(sessionId: string, event: BaileysEventEmitte
 
   const upsert: BaileysEventHandler<'chats.upsert'> = async (chats) => {
     try {
-      await Promise.any(
+      // Promise.any resolve no primeiro sucesso e só rejeita se TODOS falharem
+      // — com vários chats no lote, upserts que falham silenciosamente nunca
+      // eram reportados. Promise.all garante que toda falha caia no catch.
+      await Promise.all(
         chats
           .map((c) => transformPrisma(c))
           .filter((data) => typeof data.id === 'string' && data.id)
@@ -80,8 +83,12 @@ export default function chatHandler(sessionId: string, event: BaileysEventEmitte
 
   const del: BaileysEventHandler<'chats.delete'> = async (ids) => {
     try {
+      // Faltava filtrar por sessionId: o `id` de um chat é o JID do contato,
+      // que é o mesmo em qualquer sessão que fale com ele — sem esse filtro,
+      // apagar um chat numa sessão apagava o mesmo chat de TODAS as outras
+      // sessões que conversam com o mesmo número.
       await prisma.chat.deleteMany({
-        where: { id: { in: ids } },
+        where: { id: { in: ids }, sessionId },
       });
     } catch (e) {
       logger.error(e, 'An error occured during chats delete');

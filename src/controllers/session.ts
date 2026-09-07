@@ -9,6 +9,7 @@ import {
 } from '../wa.js';
 
 import { useLogger, usePrisma } from '../repository/shared.js';
+import { invalidateWebhookCache } from '../repository/handlers/message.js';
 
 export const list: RequestHandler = (req, res) => {
   res.status(200).json(listSessions());
@@ -134,6 +135,7 @@ export const addWebhook: RequestHandler = async (req, res) => {
     update: { ...req.body },
     where: { sessionId: sessionId!},
   });
+  invalidateWebhookCache(sessionId!);
   res.status(200).json({ status: 'created' });
 };
 
@@ -141,11 +143,12 @@ export const deleteWebhook: RequestHandler = async (req, res) => {
   const { sessionId } = req.params;
   const prisma = usePrisma();
   try {
-    await prisma.webhook.delete({  
+    await prisma.webhook.delete({
       where: { sessionId: sessionId!},
     });
   } catch (e) {
 
   }
+  invalidateWebhookCache(sessionId!);
   res.status(200).json({ status: 'deleted' });
 };

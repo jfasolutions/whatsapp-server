@@ -53,6 +53,26 @@ export async function useSession(sessionId: string) {
     }
   };
 
+  // Lê várias chaves de uma vez (1 query com IN) em vez de uma query por id —
+  // a Baileys costuma pedir várias sender-keys/session-records juntas
+  // (ex: distribuir chave de grupo pra N participantes).
+  const readMany = async (ids: string[]) => {
+    try {
+      const rows = await model.findMany({
+        select: { id: true, data: true },
+        where: { sessionId, id: { in: ids } },
+      });
+      const byId = new Map(rows.map((r) => [r.id, r.data]));
+      return ids.map((id) => {
+        const raw = byId.get(id);
+        return raw ? JSON.parse(raw, BufferJSON.reviver) : null;
+      });
+    } catch (e) {
+      logger.error(e, 'An error occured during session batch read');
+      return ids.map(() => null);
+    }
+  };
+
   const creds: AuthenticationCreds = (await read('creds')) || initAuthCreds();
 
   return {
@@ -61,15 +81,16 @@ export async function useSession(sessionId: string) {
       keys: {
         get: async (type: keyof SignalDataTypeMap, ids: string[]) => {
           const data: { [key: string]: SignalDataTypeMap[typeof type] } = {};
-          await Promise.all(
-            ids.map(async (id) => {
-              let value = await read(`${type}-${id}`);
-              if (type === 'app-state-sync-key' && value) {
-                value = proto.Message.AppStateSyncKeyData.fromObject(value);
-              }
-              data[id] = value;
-            })
-          );
+          const fixedIds = ids.map((id) => fixId(`${type}-${id}`));
+          const values = await readMany(fixedIds);
+
+          ids.forEach((id, index) => {
+            let value = values[index];
+            if (type === 'app-state-sync-key' && value) {
+              value = proto.Message.AppStateSyncKeyData.fromObject(value);
+            }
+            data[id] = value;
+          });
           return data;
         },
         set: async (data: any) => {

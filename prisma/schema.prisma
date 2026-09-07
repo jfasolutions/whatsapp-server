@@ -146,6 +146,7 @@ model Message {
 
   @@unique([sessionId, remoteJid, id], map: "unique_message_key_per_session_id")
   @@index([sessionId])
+  @@index([sessionId, remoteJid, messageTimestamp])
 }
 
 model Session {

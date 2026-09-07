@@ -6,13 +6,69 @@ import type {
 } from '@whiskeysockets/baileys';
 // Avoid static import of ESM-only package; use dynamic import where runtime helpers are needed
 import { useLogger, usePrisma } from '../shared.js';
-import type { BaileysEventHandler, MakeTransformedPrisma } from '../types.js';
+import type { BaileysEventHandler } from '../types.js';
 import { transformPrisma } from '../utils.js';
 import axios from 'axios';
-import { send } from '../../controllers/message.js';
 
 const getKeyAuthor = (key: WAMessageKey | undefined | null) =>
   (key?.fromMe ? 'me' : key?.participant || key?.remoteJid) || '';
+
+/**
+ * Nada no whats-api lê o conteúdo de mensagens recebidas do banco — a entrega
+ * real acontece pelo webhook logo abaixo. Persistimos só o necessário pro
+ * funcionamento do protocolo:
+ *  - mensagens enviadas por nós (fromMe): a Baileys usa `getMessage()` (wa.ts)
+ *    pra reenviar quando o destinatário pede retry de decriptação;
+ *  - mensagens de criação de enquete: necessárias pra somar votos depois
+ *    (getAggregateVotesInPollMessage precisa do conteúdo original).
+ * Mensagem recebida comum (texto/mídia) não precisa virar linha no MySQL.
+ */
+function shouldPersist(message: proto.IWebMessageInfo): boolean {
+  if (message.key?.fromMe) return true;
+  const content = message.message;
+  return !!(
+    content?.pollCreationMessage ||
+    content?.pollCreationMessageV2 ||
+    content?.pollCreationMessageV3
+  );
+}
+
+// Cache do webhook por sessão, invalidado por invalidateWebhookCache() quando
+// o webhook é criado/removido (ver controllers/session.ts). Evita 1 SELECT
+// por mensagem recebida só pra saber a URL de entrega.
+const webhookUrlCache = new Map<string, string | null>();
+
+export function invalidateWebhookCache(sessionId: string) {
+  webhookUrlCache.delete(sessionId);
+}
+
+async function getWebhookUrl(sessionId: string): Promise<string | null> {
+  if (webhookUrlCache.has(sessionId)) return webhookUrlCache.get(sessionId)!;
+
+  const prisma = usePrisma();
+  const webhook = await prisma.webhook.findFirst({ where: { sessionId } });
+  const url = webhook?.url ?? null;
+  webhookUrlCache.set(sessionId, url);
+  return url;
+}
+
+// Dedupe do envio de webhook em memória (a Baileys pode reemitir o mesmo id
+// em reconexões). Como mensagem comum não vai mais pro banco, não dá mais
+// pra usar "já existe no banco?" como dedupe — por isso esse cache local,
+// limitado em tamanho (FIFO) pra não crescer indefinidamente.
+const recentlyForwarded = new Map<string, true>();
+const MAX_DEDUPE_ENTRIES = 5000;
+
+function markForwarded(dedupeKey: string): boolean {
+  if (recentlyForwarded.has(dedupeKey)) return false;
+
+  recentlyForwarded.set(dedupeKey, true);
+  if (recentlyForwarded.size > MAX_DEDUPE_ENTRIES) {
+    const oldestKey = recentlyForwarded.keys().next().value;
+    if (oldestKey !== undefined) recentlyForwarded.delete(oldestKey);
+  }
+  return true;
+}
 
 export default function messageHandler(sessionId: string, event: BaileysEventEmitter) {
   const prisma = usePrisma();
@@ -21,20 +77,18 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
 
   const set: BaileysEventHandler<'messaging-history.set'> = async ({ messages, isLatest }) => {
     try {
-      await prisma.$transaction(async (tx: { message: { deleteMany: (arg0: { where: { sessionId: string; }; }) => any; createMany: (arg0: { data: { remoteJid: string; id: string; sessionId: string; key: object; message?: object | undefined; messageTimestamp?: number | undefined; status?: proto.WebMessageInfo.Status | undefined; participant?: string | undefined; messageC2STimestamp?: number | undefined; ignore?: boolean | undefined; starred?: boolean | undefined; broadcast?: boolean | undefined; pushName?: string | undefined; mediaCiphertextSha256?: Buffer | undefined; multicast?: boolean | undefined; urlText?: boolean | undefined; urlNumber?: boolean | undefined; messageStubType?: proto.WebMessageInfo.StubType | undefined; clearMedia?: boolean | undefined; messageStubParameters?: object | undefined; duration?: number | undefined; labels?: object | undefined; paymentInfo?: object | undefined; finalLiveLocation?: object | undefined; quotedPaymentInfo?: object | undefined; ephemeralStartTimestamp?: number | undefined; ephemeralDuration?: number | undefined; ephemeralOffToOn?: boolean | undefined; ephemeralOutOfSync?: boolean | undefined; bizPrivacyStatus?: proto.WebMessageInfo.BizPrivacyStatus | undefined; verifiedBizName?: string | undefined; mediaData?: object | undefined; photoChange?: object | undefined; userReceipt?: object | undefined; reactions?: object | undefined; quotedStickerData?: object | undefined; futureproofData?: Buffer | undefined; statusPsa?: object | undefined; pollUpdates?: object | undefined; pollAdditionalMetadata?: object | undefined; agentId?: string | undefined; statusAlreadyViewed?: boolean | undefined; messageSecret?: Buffer | undefined; keepInChat?: object | undefined; originalSelfAuthorUserJidString?: string | undefined; revokeMessageTimestamp?: number | undefined; pinInChat?: object | undefined; }[]; }) => any; }; }) => {
-        if (isLatest) await tx.message.deleteMany({ where: { sessionId } });
+      const validMessages = messages.filter(
+        (m) => m.key?.id && m.key?.remoteJid && shouldPersist(m)
+      );
 
-        // Only create messages that have a valid key with id and remoteJid
-        const validMessages = messages.filter(
-          (m) => m.key && m.key.id && m.key.remoteJid
-        );
+      await prisma.$transaction(async (tx) => {
+        if (isLatest) await tx.message.deleteMany({ where: { sessionId } });
 
         if (validMessages.length) {
           await tx.message.createMany({
             data: validMessages.map((message) => ({
               ...transformPrisma(message),
-              // ensure Prisma sees `key` as an object and id/remoteJid are present
-              key: (message.key as unknown) as object,
+              key: message.key as unknown as object,
               remoteJid: message.key.remoteJid!,
               id: message.key.id!,
               sessionId,
@@ -42,114 +96,76 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
           });
         }
       });
-      logger.info({ messages: messages.length }, 'Synced messages');
+      logger.info(
+        { received: messages.length, stored: validMessages.length },
+        'Synced messages'
+      );
     } catch (e) {
       logger.error(e, 'An error occured during messages set');
     }
   };
 
   const upsert: BaileysEventHandler<'messages.upsert'> = async ({ messages, type }) => {
-    let sent: (string | null | undefined)[] = [];
-    switch (type) {
-      case 'append':
-      case 'notify':
-        for (const message of messages) {
-          const storedMsg = await prisma.message.findFirst({
-            where: {
-              id: message.key.id!,
-              // Adicione outras condições se necessário
-            },
+    if (type !== 'append' && type !== 'notify') return;
+
+    const webhookUrl = await getWebhookUrl(sessionId);
+
+    for (const message of messages) {
+      try {
+        const dedupeKey = `${sessionId}:${message.key.id}`;
+        if (message.message && webhookUrl && markForwarded(dedupeKey)) {
+          axios
+            .post(webhookUrl, { message })
+            .catch((e) => logger.error(e, 'Failed to deliver webhook'));
+        }
+
+        if (!message.key.id || !message.key.remoteJid) continue;
+
+        const baileys = await import('@whiskeysockets/baileys');
+        const { jidNormalizedUser, toNumber } = baileys;
+        const jid = jidNormalizedUser(message.key.remoteJid);
+
+        if (shouldPersist(message)) {
+          const data = transformPrisma(message);
+          await prisma.message.upsert({
+            select: { pkId: true },
+            create: { ...data, remoteJid: jid, id: message.key.id, sessionId },
+            update: { ...data },
+            where: { sessionId_remoteJid_id: { remoteJid: jid, id: message.key.id, sessionId } },
           });
+        }
 
-          try {
-            if (message.message) {
-              const webhook = await prisma.webhook.findFirst({ where: { sessionId } });
-              if (webhook) {           
-              axios.post(webhook.url, {
-                  message
-                }).then(response => {
-                  sent.push(message.key.id);
-                  console.log(response.data);
-                });
-              }
-            }
-          } catch (e) {
-            console.error('Error sending webhook:', e);
-          }
-
-          if (storedMsg) {
-              return;
-          }
-          
-          try {
-            const baileys = await import('@whiskeysockets/baileys');
-            const { jidNormalizedUser, toNumber } = baileys;
-            const jid = jidNormalizedUser(message.key.remoteJid!);
-            const data = transformPrisma(message);
-            await prisma.message.upsert({
-              select: { pkId: true },
-              create: { ...data, remoteJid: jid, id: message.key.id!, sessionId },
-              update: { ...data },
-              where: { sessionId_remoteJid_id: { remoteJid: jid, id: message.key.id!, sessionId } },
-            });
-
-            const chatExists = (await prisma.chat.count({ where: { id: jid, sessionId } })) > 0;
-            if (type === 'notify' && !chatExists) {
-              event.emit('chats.upsert', [
-                {
-                  id: jid,
-                  conversationTimestamp: toNumber(message.messageTimestamp),
-                  unreadCount: 1,
-                },
-              ]);
-            }
-          } catch (e) {
-            logger.error(e, 'An error occured during message upsert');
+        if (type === 'notify') {
+          const chatExists = (await prisma.chat.count({ where: { id: jid, sessionId } })) > 0;
+          if (!chatExists) {
+            event.emit('chats.upsert', [
+              {
+                id: jid,
+                conversationTimestamp: toNumber(message.messageTimestamp),
+                unreadCount: message.key.fromMe ? 0 : 1,
+              },
+            ]);
           }
         }
-        break;
+      } catch (e) {
+        logger.error(e, 'An error occured during message upsert');
+      }
     }
   };
 
   const update: BaileysEventHandler<'messages.update'> = async (updates) => {
     for (const { update, key } of updates) {
       try {
-        await prisma.$transaction(async (tx: { message: { findFirst: (arg0: { where: { id: string; remoteJid: string; sessionId: string; }; }) => any; delete: (arg0: { select: { pkId: boolean; }; where: { sessionId_remoteJid_id: { id: string; remoteJid: string; sessionId: string; }; }; }) => any; create: (arg0: { select: { pkId: boolean; }; data: { id: string; remoteJid: string; sessionId: string; key: object; message?: object | undefined; messageTimestamp?: number | undefined; status?: proto.WebMessageInfo.Status | undefined; participant?: string | undefined; messageC2STimestamp?: number | undefined; ignore?: boolean | undefined; starred?: boolean | undefined; broadcast?: boolean | undefined; pushName?: string | undefined; mediaCiphertextSha256?: Buffer | undefined; multicast?: boolean | undefined; urlText?: boolean | undefined; urlNumber?: boolean | undefined; messageStubType?: proto.WebMessageInfo.StubType | undefined; clearMedia?: boolean | undefined; messageStubParameters?: object | undefined; duration?: number | undefined; labels?: object | undefined; paymentInfo?: object | undefined; finalLiveLocation?: object | undefined; quotedPaymentInfo?: object | undefined; ephemeralStartTimestamp?: number | undefined; ephemeralDuration?: number | undefined; ephemeralOffToOn?: boolean | undefined; ephemeralOutOfSync?: boolean | undefined; bizPrivacyStatus?: proto.WebMessageInfo.BizPrivacyStatus | undefined; verifiedBizName?: string | undefined; mediaData?: object | undefined; photoChange?: object | undefined; userReceipt?: object | undefined; reactions?: object | undefined; quotedStickerData?: object | undefined; futureproofData?: Buffer | undefined; statusPsa?: object | undefined; pollUpdates?: object | undefined; pollAdditionalMetadata?: object | undefined; agentId?: string | undefined; statusAlreadyViewed?: boolean | undefined; messageSecret?: Buffer | undefined; keepInChat?: object | undefined; originalSelfAuthorUserJidString?: string | undefined; revokeMessageTimestamp?: number | undefined; pinInChat?: object | undefined; }; }) => any; }; }) => {
-          const prevData = await tx.message.findFirst({
-            where: { id: key.id!, remoteJid: key.remoteJid!, sessionId },
-          });
-          if (!prevData) {
-            return logger.info({ update }, 'Got update for non existent message');
-          }
-
-          const data = { ...prevData, ...update } as proto.IWebMessageInfo;
-          // Ensure the merged data has a key before attempting create
-          if (!data.key || !data.key.id || !data.key.remoteJid) {
-            logger.warn({ update }, 'Skipping message update: missing key information');
-            return;
-          }
-          await tx.message.delete({
-            select: { pkId: true },
-            where: {
-              sessionId_remoteJid_id: {
-                id: key.id!,
-                remoteJid: key.remoteJid!,
-                sessionId,
-              },
-            },
-          });
-          await tx.message.create({
-            select: { pkId: true },
-            data: {
-              ...transformPrisma(data),
-              // ensure Prisma non-optional `key` field is present
-              key: (data.key as unknown) as object,
-              id: data.key.id!,
-              remoteJid: data.key.remoteJid!,
-              sessionId,
-            },
-          });
+        // removeNullable=false: um update de revogação zera `message` pra
+        // null explicitamente — precisamos mandar esse null pro updateMany,
+        // senão o conteúdo antigo fica preso na linha.
+        const result = await prisma.message.updateMany({
+          data: transformPrisma(update as Record<string, any>, false),
+          where: { id: key.id!, remoteJid: key.remoteJid!, sessionId },
         });
+        if (result.count === 0) {
+          logger.info({ update }, 'Got update for non existent message');
+        }
       } catch (e) {
         logger.error(e, 'An error occured during message update');
       }
@@ -175,13 +191,13 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
   const updateReceipt: BaileysEventHandler<'message-receipt.update'> = async (updates) => {
     for (const { key, receipt } of updates) {
       try {
-        await prisma.$transaction(async (tx: { message: { findFirst: (arg0: { select: { userReceipt: boolean; }; where: { id: string; remoteJid: string; sessionId: string; }; }) => any; update: (arg0: { select: { pkId: boolean; }; data: MakeTransformedPrisma<{ userReceipt: proto.IUserReceipt[]; }, true>; where: { sessionId_remoteJid_id: { id: string; remoteJid: string; sessionId: string; }; }; }) => any; }; }) => {
+        await prisma.$transaction(async (tx) => {
           const message = await tx.message.findFirst({
             select: { userReceipt: true },
             where: { id: key.id!, remoteJid: key.remoteJid!, sessionId },
           });
           if (!message) {
-            return logger.debug({ update }, 'Got receipt update for non existent message');
+            return logger.debug({ receipt }, 'Got receipt update for non existent message');
           }
 
           let userReceipt = (message.userReceipt || []) as unknown as MessageUserReceipt[];
@@ -210,13 +226,13 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
   const updateReaction: BaileysEventHandler<'messages.reaction'> = async (reactions) => {
     for (const { key, reaction } of reactions) {
       try {
-        await prisma.$transaction(async (tx: { message: { findFirst: (arg0: { select: { reactions: boolean; }; where: { id: string; remoteJid: string; sessionId: string; }; }) => any; update: (arg0: { select: { pkId: boolean; }; data: MakeTransformedPrisma<{ reactions: proto.IReaction[]; }, true>; where: { sessionId_remoteJid_id: { id: string; remoteJid: string; sessionId: string; }; }; }) => any; }; }) => {
+        await prisma.$transaction(async (tx) => {
           const message = await tx.message.findFirst({
             select: { reactions: true },
             where: { id: key.id!, remoteJid: key.remoteJid!, sessionId },
           });
           if (!message) {
-            return logger.debug({ update }, 'Got reaction update for non existent message');
+            return logger.debug({ update: reaction }, 'Got reaction update for non existent message');
           }
 
           const authorID = getKeyAuthor(reaction.key);

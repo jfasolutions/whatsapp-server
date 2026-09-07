@@ -171,22 +171,6 @@ export async function createSession(options: createSessionOptions) {
   const { state, saveCreds } = await useSession(sessionId);
   logger.info({ sessionId, hasCreds: !!state?.creds }, 'Loaded session state');
 
-  // Adapt `state.keys` to implement `SignalKeyStore`
-  const keys = {
-    get: async (type: string, ids: string[]) => {
-      const result: Record<string, any> = {};
-      for (const id of ids) {
-        // Implementar a lógica de busca dos dados necessários
-       // result[id] = /* Obtenha os dados do armazenamento */
-      }
-      return result;
-    },
-    set: async (data: Record<string, any>) => {
-      // Implementar a lógica de armazenamento dos dados
-    },
-    // Outros métodos como 'remove' podem ser implementados aqui se necessário
-  };
-
   // Ensure user-provided socketConfig cannot force QR printing in terminal
   const finalSocketConfig = { ...(socketConfig || {}) };
   if ('printQRInTerminal' in finalSocketConfig) delete (finalSocketConfig as any).printQRInTerminal;
@@ -195,15 +179,17 @@ export async function createSession(options: createSessionOptions) {
     // Do not print QR in terminal; we'll return it via the HTTP response/SSE
     printQRInTerminal: false,
     version,
-    auth: state,
-    browser: ["SendALL", "Chrome", "145.0.0"], 
+    auth: {
+      creds: state.creds,
+      // Sem isso, toda leitura de chave Signal (pre-key, session record, sender-key)
+      // vai direto no MySQL — em cada mensagem enviada/recebida. O cache evita
+      // reconsultar o banco pra chaves já lidas nesta sessão em memória.
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
+    browser: ["SendALL", "Chrome", "145.0.0"],
    //browser: Browsers.ubuntu('Chrome'),
    // generateHighQualityLinkPreview: true,
    // ...finalSocketConfig,
-   // auth: {
-   //   creds: state.creds,
-   //   keys: makeCacheableSignalKeyStore(keys, logger),
-   // },
   logger,
   shouldIgnoreJid: (jid: string) => isJidBroadcast(jid),
   getMessage: async (key: any) => {
