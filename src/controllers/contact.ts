@@ -11,7 +11,7 @@ export const list: RequestHandler = async (req, res) => {
       cursor: cursor ? { pkId: Number(cursor) } : undefined,
       take: Number(limit),
       skip: cursor ? 1 : 0,
-      where: { id: { endsWith: 's.whatsapp.net' }, sessionId },
+      where: { type: 'contact', sessionId },
     });
 
     res.status(200).json({

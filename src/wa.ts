@@ -186,8 +186,10 @@ export async function createSession(options: createSessionOptions) {
       // reconsultar o banco pra chaves já lidas nesta sessão em memória.
       keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
-    browser: ["SendALL", "Chrome", "145.0.0"],
-   //browser: Browsers.ubuntu('Chrome'),
+    // "SendALL" no nome do dispositivo em "Aparelhos conectados" é um sinal
+    // fácil de identificar como automação — usar um identificador comum
+    // (Ubuntu/Chrome) reduz a chance de bloqueio.
+    browser: Browsers.ubuntu('Chrome'),
    // generateHighQualityLinkPreview: true,
    // ...finalSocketConfig,
   logger,

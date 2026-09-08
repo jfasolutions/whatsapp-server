@@ -7,14 +7,14 @@ const router = Router({ mergeParams: true });
 router.get(
   '/',
   query('cursor').isNumeric().optional(),
-  query('limit').isNumeric().optional(),
+  query('limit').isInt({ min: 1, max: 100 }).optional(),
   requestValidator,
   controller.list
 );
 router.get(
   '/:jid',
   query('cursor').isNumeric().optional(),
-  query('limit').isNumeric().optional(),
+  query('limit').isInt({ min: 1, max: 100 }).optional(),
   requestValidator,
   controller.find
 );

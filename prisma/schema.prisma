@@ -67,9 +67,14 @@ model Contact {
   verifiedName String? @db.VarChar(128)
   imgUrl       String? @db.VarChar(255)
   status       String? @db.VarChar(128)
+  // Calculado a partir do sufixo do `id` na escrita (ver contactHandler) pra
+  // permitir filtrar /contacts e /groups por índice em vez de LIKE '%sufixo'
+  // (que não usa índice e varre todo mundo daquela sessão).
+  type         String  @default("contact") @db.VarChar(16)
 
   @@unique([sessionId, id], map: "unique_id_per_session_id")
   @@index([sessionId])
+  @@index([sessionId, type])
 }
 
 model GroupMetadata {

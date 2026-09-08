@@ -2,14 +2,16 @@ import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
 import routes from './routes/index.js';
+import { logger } from './shared.js';
 import { init } from './wa.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-// Simple request logger to help debug incoming requests (method + path)
+// Log de requisições via pino (assíncrono) em vez de console.log (I/O
+// síncrono a cada request — pesa mais com o polling de status do frontend).
 app.use((req, _res, next) => {
-  console.log(`REQ ${req.method} ${req.path}`);
+  logger.debug({ method: req.method, path: req.path }, 'REQ');
   next();
 });
 app.use('/', routes);

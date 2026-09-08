@@ -3,6 +3,11 @@ import { useLogger, usePrisma } from '../shared.js';
 import type { BaileysEventHandler } from '../types.js';
 import { transformPrisma } from '../utils.js';
 
+// Grupo e contato individual moram na mesma tabela, diferenciados só pelo
+// sufixo do JID. Calculamos isso uma vez na escrita e guardamos em `type`
+// pra /contacts e /groups poderem filtrar por índice em vez de LIKE '%sufixo'.
+const resolveContactType = (id: string) => (id.endsWith('g.us') ? 'group' : 'contact');
+
 export default function contactHandler(sessionId: string, event: BaileysEventEmitter) {
   const prisma = usePrisma();
   const logger = useLogger();
@@ -23,13 +28,16 @@ export default function contactHandler(sessionId: string, event: BaileysEventEmi
         .map((data) =>
           prisma.contact.upsert({
             select: { pkId: true },
-            create: { ...data, sessionId },
+            create: { ...data, sessionId, type: resolveContactType(data.id) },
             update: data,
             where: { sessionId_id: { id: data.id, sessionId } },
           })
         );
 
-      await Promise.any([
+      // Promise.any resolve no 1º sucesso e só rejeita se TODOS falharem —
+      // com várias promises no lote, falha em upsert/delete individual nunca
+      // caía no catch. Promise.all garante que qualquer falha seja reportada.
+      await Promise.all([
         ...upsertPromises,
         prisma.contact.deleteMany({ where: { id: { in: deletedOldContactIds }, sessionId } }),
       ]);
@@ -44,13 +52,13 @@ export default function contactHandler(sessionId: string, event: BaileysEventEmi
 
   const upsert: BaileysEventHandler<'contacts.upsert'> = async (contacts) => {
     try {
-      await Promise.any(
+      await Promise.all(
         contacts
           .map((c) => transformPrisma(c))
           .map((data) =>
             prisma.contact.upsert({
               select: { pkId: true },
-              create: { ...data, sessionId },
+              create: { ...data, sessionId, type: resolveContactType(data.id) },
               update: data,
               where: { sessionId_id: { id: data.id, sessionId } },
             })
