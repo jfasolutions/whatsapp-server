@@ -37,8 +37,14 @@ export const send: RequestHandler = async (req, res) => {
     const { jid, type = 'number', message, options } = req.body;
     const session = getSession(req.params.sessionId)!;
 
-    const exists = await jidExists(session, jid, type);
-    if (!exists) return res.status(400).json({ error: 'JID does not exists' });
+    // jid já é um JID completo (@s.whatsapp.net, @lid...)? onWhatsApp() só resolve
+    // número de telefone cru, então rodar essa checagem aqui rejeita JIDs válidos
+    // (ex: @lid, usado pelo WhatsApp às vezes no lugar do número real). Grupo
+    // continua checando (groupMetadata, não é resolução de telefone).
+    if (type === 'group' || !jid.includes('@')) {
+      const exists = await jidExists(session, jid, type);
+      if (!exists) return res.status(400).json({ error: 'JID does not exists' });
+    }
 
     const result = await session.sendMessage(jid, message, options);
     res.status(200).json(result);
@@ -59,10 +65,12 @@ export const sendBulk: RequestHandler = async (req, res) => {
     { jid, type = 'number', delay = 1000, message, options },
   ] of req.body.entries()) {
     try {
-      const exists = await jidExists(session, jid, type);
-      if (!exists) {
-        errors.push({ index, error: 'JID does not exists' });
-        continue;
+      if (type === 'group' || !jid.includes('@')) {
+        const exists = await jidExists(session, jid, type);
+        if (!exists) {
+          errors.push({ index, error: 'JID does not exists' });
+          continue;
+        }
       }
 
       if (index > 0) await delayMs(delay);

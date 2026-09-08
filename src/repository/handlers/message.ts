@@ -154,6 +154,8 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
   };
 
   const update: BaileysEventHandler<'messages.update'> = async (updates) => {
+    const webhookUrl = await getWebhookUrl(sessionId);
+
     for (const { update, key } of updates) {
       try {
         // removeNullable=false: um update de revogação zera `message` pra
@@ -165,6 +167,16 @@ export default function messageHandler(sessionId: string, event: BaileysEventEmi
         });
         if (result.count === 0) {
           logger.info({ update }, 'Got update for non existent message');
+        }
+
+        // Status de entrega/leitura só interessa pra mensagem que NÓS mandamos
+        // (fromMe) - status >= DELIVERY_ACK(3) é o que dá pra mostrar como
+        // check duplo (entregue) / check colorido (lido) no painel. Ninguém
+        // encaminhava isso antes - só ficava salvo aqui, sem sair pro webhook.
+        if (key.fromMe && webhookUrl && typeof update.status === 'number' && update.status >= 3) {
+          axios
+            .post(webhookUrl, { status_update: { key, status: update.status } })
+            .catch((e) => logger.error(e, 'Failed to deliver status webhook'));
         }
       } catch (e) {
         logger.error(e, 'An error occured during message update');
