@@ -120,8 +120,18 @@ export const addSSE: RequestHandler = async (req, res) => {
 };
 
 export const del: RequestHandler = async (req, res) => {
-  await deleteSession(req.params.sessionId);
-  res.status(200).json({ message: 'Session deleted' });
+  const loggedOut = await deleteSession(req.params.sessionId);
+  if (loggedOut) {
+    res.status(200).json({ message: 'Session deleted' });
+    return;
+  }
+  // Sessão local foi limpa mesmo assim (deleteSession sempre remove o que
+  // tem localmente), mas o WhatsApp não foi avisado — quem chamou (whats-api)
+  // precisa saber disso pra não afirmar "desconectado com sucesso" quando o
+  // aparelho ainda vai aparecer em "Aparelhos conectados" no celular.
+  res.status(502).json({
+    message: 'Sessão local removida, mas não foi possível avisar o WhatsApp (conexão já estava perdida).',
+  });
 };
 
 export const addWebhook: RequestHandler = async (req, res) => {

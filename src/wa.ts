@@ -10,7 +10,7 @@ import { logger, prisma } from './shared.js';
 import { delay } from './utils.js';
 
 type Session = WASocket & {
-  destroy: () => Promise<void>;
+  destroy: (logout?: boolean) => Promise<boolean>;
   store: Store;
 };
 
@@ -73,21 +73,37 @@ export async function createSession(options: createSessionOptions) {
   console.log(`createSession START sessionId=${sessionId} SSE=${SSE} readIncoming=${readIncomingMessages}`);
   logger.info({ sessionId, SSE, readIncomingMessages }, 'Starting createSession');
 
+  // Retorna se o logout de verdade (o WhatsApp avisado, dispositivo some de
+  // "Aparelhos conectados" no celular) funcionou — Promise.allSettled em vez
+  // de Promise.all porque queremos SEMPRE terminar a limpeza local (banco +
+  // mapa em memória) mesmo que o logout falhe, e precisamos saber qual dos
+  // dois aconteceu pra responder direito pra quem chamou.
   const destroy = async (logout = true) => {
+    let logoutSucceeded = !logout;
     try {
-      await Promise.all([
-        logout && socket.logout(),
+      const [logoutResult] = await Promise.allSettled([
+        logout ? socket.logout() : Promise.resolve(),
         prisma.chat.deleteMany({ where: { sessionId } }),
         prisma.contact.deleteMany({ where: { sessionId } }),
         prisma.message.deleteMany({ where: { sessionId } }),
         prisma.groupMetadata.deleteMany({ where: { sessionId } }),
         prisma.session.deleteMany({ where: { sessionId } }),
       ]);
+      if (logout) {
+        logoutSucceeded = logoutResult.status === 'fulfilled';
+        if (!logoutSucceeded) {
+          logger.error(
+            (logoutResult as PromiseRejectedResult).reason,
+            'Falha ao enviar o logout pro WhatsApp — sessão local removida mesmo assim, aparelho pode continuar em "Aparelhos conectados" no celular'
+          );
+        }
+      }
     } catch (e) {
       logger.error(e, 'An error occurred during session destroy');
     } finally {
       sessions.delete(sessionId);
     }
+    return logoutSucceeded;
   };
 
   const handleConnectionClose = () => {
@@ -106,7 +122,16 @@ export async function createSession(options: createSessionOptions) {
         !SSE && !res.headersSent && res.status(500).json({ error: 'Unable to create session' });
         res.end();
       }
-      destroy(doNotReconnect);
+      // A conexão já fechou nesse ponto (é por isso que handleConnectionClose
+      // está rodando) — chamar socket.logout() aqui sempre falha com "Connection
+      // Closed" (confirmado em produção), porque o logout precisa de um socket
+      // vivo pra mandar o frame pro WhatsApp. Resultado real: a sessão local é
+      // limpa mas o telefone nunca é avisado, e o dispositivo linkado fica "preso"
+      // lá até o próprio WhatsApp expirar por inatividade. Não tem como evitar
+      // isso quando a conexão cai sozinha (rede, etc) — só dá pra deslogar de
+      // verdade enquanto o socket ainda está de pé (ver deleteSession/destroySession,
+      // acionado pelo botão "Desconectar" com o device ainda conectado).
+      destroy(false);
       return;
     }
 
@@ -259,8 +284,10 @@ export function getSession(sessionId: string) {
   return sessions.get(sessionId);
 }
 
-export async function deleteSession(sessionId: string) {
-  sessions.get(sessionId)?.destroy();
+export async function deleteSession(sessionId: string): Promise<boolean> {
+  const session = sessions.get(sessionId);
+  if (!session) return false;
+  return session.destroy();
 }
 
 export function sessionExists(sessionId: string) {
