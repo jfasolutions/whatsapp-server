@@ -64,7 +64,7 @@ export async function createSession(options: createSessionOptions) {
   // cast to any to avoid circular type issues at runtime
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const makeWASocket: any = baileys.default ?? (baileys as any).makeWASocket;
-  const { Browsers, DisconnectReason, isJidBroadcast, makeCacheableSignalKeyStore, fetchLatestBaileysVersion } =
+  const { Browsers, DisconnectReason, isJidBroadcast, makeCacheableSignalKeyStore, fetchLatestBaileysVersion, getUrlInfo } =
     baileys as any;
   const { version } = await fetchLatestBaileysVersion();
   let connectionState: Partial<ConnectionState> = { connection: 'close' };
@@ -215,7 +215,11 @@ export async function createSession(options: createSessionOptions) {
     // fácil de identificar como automação — usar um identificador comum
     // (Ubuntu/Chrome) reduz a chance de bloqueio.
     browser: Browsers.ubuntu('Chrome'),
-   // generateHighQualityLinkPreview: true,
+    // Sem isso, um link na mensagem sai cru (sem card/imagem) — o Baileys só
+    // gera o preview se alguém fornecer essa função (usa link-preview-js por
+    // baixo, já era dependência instalada mas nunca conectada aqui).
+    generateHighQualityLinkPreview: true,
+    getUrlInfo: (text: string) => getUrlInfo(text, { thumbnailWidth: 192, fetchOpts: { timeout: 5000 } }),
    // ...finalSocketConfig,
   logger,
   shouldIgnoreJid: (jid: string) => isJidBroadcast(jid),
